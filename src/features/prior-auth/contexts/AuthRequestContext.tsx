@@ -1,3 +1,4 @@
+// Updated AuthRequestContext.tsx with proper refetching after create
 import React, { createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/shared/integrations/supabase/client';
@@ -57,126 +58,62 @@ export function AuthRequestProvider({ children }: { children: React.ReactNode })
   const { toast } = useToast();
   const { user } = useAuth();
 
-  console.log('AuthRequestProvider - User:', user?.id);
-
   const { data: requests = [], isLoading, error } = useQuery({
     queryKey: ['authRequests'],
     queryFn: async () => {
-      console.log('Starting auth requests query...');
-      if (!user?.id) {
-        console.error('No user ID available');
-        return [];
-      }
-
-      try {
-        // First get the user's profile to check their role
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        console.log('User profile:', {
-          id: user.id,
-          profile,
-          error: profileError
-        });
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          throw profileError;
-        }
-
-        if (!profile) {
-          console.error('No profile found for user');
-          return [];
-        }
-
-        // Get the requests for this provider
-        const { data: providerRequests, error: providerError } = await supabase
-          .from('auth_requests')
-          .select('*')
-          .eq('provider_id', profile.id)
-          .order('submitted_at', { ascending: false });
-
-        console.log('Provider requests:', {
-          providerId: profile.id,
-          count: providerRequests?.length || 0,
-          error: providerError
-        });
-
-        if (providerError) {
-          console.error('Error fetching provider requests:', providerError);
-          throw providerError;
-        }
-
-        return providerRequests || [];
-      } catch (err) {
-        console.error('Error in auth requests query:', err);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to fetch authorization requests',
-        });
-        throw err;
-      }
+      if (!user?.id) return [];
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      if (profileError || !profile) return [];
+      const { data: providerRequests, error: providerError } = await supabase
+        .from('auth_requests')
+        .select('*')
+        .eq('provider_id', profile.id)
+        .order('submitted_at', { ascending: false });
+      if (providerError) throw providerError;
+      return providerRequests || [];
     },
     enabled: !!user,
     retry: 2,
     retryDelay: 1000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    staleTime: 30000, // Consider data stale after 30 seconds
-    gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAuthRequestData) => {
-      console.log('Starting createRequest mutation with data:', data);
-      
-      try {
-        const HARDCODED_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRucG5hdmZydWJtbHh3c3BjdWVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzc1OTkwNywiZXhwIjoyMDYzMzM1OTA3fQ.RKfHI7e7SnGHXOCAIVJM1FTjfTd0yTip2NTlmpBvJZo';
-
-        console.log('Making API request to:', `${API_BASE_URL}/api/v1/auth-requests/`);
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth-requests/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${HARDCODED_TOKEN}`,
-          },
-          body: JSON.stringify({
-            ...data,
-            status: 'PENDING',
-            provider_id: user?.id,
-          }),
-        });
-
-        console.log('API Response:', response.status, response.statusText);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: 'Failed to parse error response' }));
-          console.error('API Error:', errorData);
-          throw new Error(errorData.detail || 'Failed to create authorization request');
-        }
-
-        const responseData = await response.json();
-        console.log('API Success Response:', responseData);
-        return responseData;
-      } catch (error) {
-        console.error('Mutation error:', error);
-        throw error;
+      const HARDCODED_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRucG5hdmZydWJtbHh3c3BjdWVhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzc1OTkwNywiZXhwIjoyMDYzMzM1OTA3fQ.RKfHI7e7SnGHXOCAIVJM1FTjfTd0yTip2NTlmpBvJZo';
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth-requests/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${HARDCODED_TOKEN}`,
+        },
+        body: JSON.stringify({
+          ...data,
+          status: 'PENDING',
+          provider_id: user?.id,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to parse error response' }));
+        throw new Error(errorData.detail || 'Failed to create authorization request');
       }
+      return await response.json();
     },
-    onSuccess: (data) => {
-      console.log('Mutation succeeded with data:', data);
-      queryClient.invalidateQueries({ queryKey: ['authRequests'] });
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['authRequests'] });
       toast({
         title: 'Success',
         description: `Prior authorization request for ${data.patient_name} has been created and is pending review.`,
       });
     },
     onError: (error: Error) => {
-      console.error('Mutation failed:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -196,48 +133,29 @@ export function AuthRequestProvider({ children }: { children: React.ReactNode })
         .eq('id', id)
         .select()
         .single();
-
       if (error) throw error;
       return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['authRequests'] });
-      toast({
-        title: 'Success',
-        description: 'Prior authorization request updated successfully',
-      });
+      toast({ title: 'Success', description: 'Prior authorization request updated successfully' });
     },
     onError: (error: Error) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message,
-      });
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('auth_requests')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('auth_requests').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['authRequests'] });
-      toast({
-        title: 'Success',
-        description: 'Prior authorization request deleted successfully',
-      });
+      toast({ title: 'Success', description: 'Prior authorization request deleted successfully' });
     },
     onError: (error: Error) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message,
-      });
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     },
   });
 
@@ -247,8 +165,7 @@ export function AuthRequestProvider({ children }: { children: React.ReactNode })
   };
 
   const updateRequest = async (id: string, data: UpdateAuthRequestData) => {
-    const updatedRequest = await updateMutation.mutateAsync({ id, data });
-    return updatedRequest;
+    return await updateMutation.mutateAsync({ id, data });
   };
 
   const deleteRequest = async (id: string) => {
@@ -277,4 +194,4 @@ export function useAuthRequest() {
     throw new Error('useAuthRequest must be used within an AuthRequestProvider');
   }
   return context;
-} 
+}

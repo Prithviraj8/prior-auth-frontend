@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/shared/components/ui/sonner";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useSupabaseSession } from "@/shared/hooks/useSupabaseSession";
 
 // Feature imports
 import { AuthProvider } from "@/features/auth/contexts/AuthContext";
@@ -15,47 +16,55 @@ import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <AuthRequestProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Index />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/request/:id"
-                element={
-                  <ProtectedRoute>
-                    <RequestDetailPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/new-request"
-                element={
-                  <ProtectedRoute>
-                    <NewRequestPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </AuthRequestProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const { loading } = useSupabaseSession();
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center' }}>Loading session...</div>;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <AuthRequestProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <Index />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/request/:id"
+                  element={
+                    <ProtectedRoute>
+                      <RequestDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/new-request"
+                  element={
+                    <ProtectedRoute>
+                      <NewRequestPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthRequestProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
