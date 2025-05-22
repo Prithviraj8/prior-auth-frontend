@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthRequest } from '@/features/prior-auth/contexts/AuthRequestContext';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Search, Plus } from 'lucide-react';
+import { supabase } from '@/shared/integrations/supabase/client';
 
 export function AuthRequestList() {
   const { requests, isLoading } = useAuthRequest();
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
-  
+
+  // Log the current Supabase session for debugging
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      console.log('Supabase session:', data?.session);
+      if (error) console.error('Supabase session error:', error);
+    });
+  }, []);
+
   const filteredRequests = requests.filter(req => 
     req.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     req.procedure_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -45,7 +54,9 @@ export function AuthRequestList() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-semibold text-gray-800">Prior Authorization Requests</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-semibold text-gray-800">Prior Authorization Requests</h2>
+        </div>
         
         <div className="flex w-full sm:w-auto gap-2">
           <div className="relative flex-1">
@@ -96,10 +107,10 @@ export function AuthRequestList() {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-foreground">{request.patient_name}</div>
-                    <div className="text-xs text-muted-foreground">DOB: {request.patient_dob}</div>
+                    <div className="text-xs text-muted-foreground">ID: {request.patient_id}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-foreground">{request.insurance_provider}</div>
+                    <div className="text-sm text-foreground">{request.payer_name || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-foreground">{request.procedure_code}</div>

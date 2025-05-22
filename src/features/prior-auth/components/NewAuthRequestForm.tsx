@@ -153,25 +153,33 @@ export function NewAuthRequestForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate the form
-    const requiredFields = ['patientName', 'patientId', 'procedureCode', 'procedureDescription', 'diagnosisCode', 'diagnosisDescription', 'justification'];
-    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
-    
+  
+    const requiredFields = [
+      'patientName',
+      'patientId',
+      'procedureCode',
+      'procedureDescription',
+      'diagnosisCode',
+      'diagnosisDescription',
+      'justification'
+    ];
+    const missingFields = requiredFields.filter(
+      field => !formData[field as keyof typeof formData]
+    );
+  
     if (missingFields.length > 0) {
       toast.error(`Please complete the following fields: ${missingFields.join(', ')}`);
       return;
     }
-    
+  
     setIsSubmitting(true);
     try {
-      // Convert urgency to proper priority format
       const priorityMap = {
         'standard': 'Standard',
         'urgent': 'Urgent',
         'emergency': 'Emergency'
       } as const;
-
+  
       const requestData = {
         patient_name: formData.patientName,
         patient_id: formData.patientId,
@@ -184,9 +192,8 @@ export function NewAuthRequestForm() {
         payer_name: formData.payerName || undefined,
         payer_id: formData.payerId || undefined,
       };
-
-      await createRequest(requestData);
-      // Navigate to the main authorizations page
+  
+      const newRequest = await createRequest(requestData);
       navigate('/');
     } catch (error) {
       console.error('Failed to create request:', error);
@@ -195,6 +202,7 @@ export function NewAuthRequestForm() {
       setIsSubmitting(false);
     }
   };
+  
 
   return (
     <div className="space-y-6">
